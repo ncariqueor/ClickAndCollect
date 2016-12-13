@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"/>
     <link rel="stylesheet" type="text/css" href="bootstrap-3.3.6-dist/css/bootstrap.css"/>
     <link rel="stylesheet" type="text/css" href="bootstrap-select-1.9.4/dist/css/bootstrap-select.css"/>
+    <script>
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+                (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-88784345-1', 'auto');
+        ga('send', 'pageview');
+
+    </script>
 </head>
 
 <body onload="asignar();">
@@ -848,10 +858,10 @@ if(isset($_POST['dia']) && isset($_POST['mes']) && isset($_POST['anio']) && isse
     $sumON = 0;
 
     while($row = mysqli_fetch_assoc($res)){
-        $monto += $row['monto'];
-        $sumOrd += $row['ordTienda'];
-        $sumN += $row['ncredito'];
-        $sumON += $row['ordncredito'];
+        $monto = $row['monto'];
+        $sumOrd = $row['ordTienda'];
+        $sumN = $row['ncredito'];
+        $sumON = $row['ordncredito'];
     }
 
     $ingresoneto = round(($monto - $sumN) / 1.19);
@@ -884,10 +894,10 @@ if(isset($_POST['dia']) && isset($_POST['mes']) && isset($_POST['anio']) && isse
     $sumONAnt = 0;
 
     while($row = mysqli_fetch_assoc($res)){
-        $montoAnt += $row['monto'];
-        $sumOrdAnt += $row['ordTienda'];
-        $sumNAnt += $row['ncredito'];
-        $sumONAnt += $row['ordncredito'];
+        $montoAnt = $row['monto'];
+        $sumOrdAnt = $row['ordTienda'];
+        $sumNAnt = $row['ncredito'];
+        $sumONAnt = $row['ordncredito'];
     }
 
     $ingresonetoAnt = round(($montoAnt - $sumNAnt) / 1.19);
@@ -1045,10 +1055,10 @@ if(isset($_POST['dia']) && isset($_POST['mes']) && isset($_POST['anio']) && isse
     $sumON = 0;
 
     while($row = mysqli_fetch_assoc($res)){
-        $monto += $row['monto'];
-        $sumOrd += $row['ordTienda'];
-        $sumN += $row['ncredito'];
-        $sumON += $row['ordncredito'];
+        $monto = $row['monto'];
+        $sumOrd = $row['ordTienda'];
+        $sumN = $row['ncredito'];
+        $sumON = $row['ordncredito'];
     }
 
     $ingresoneto = round(($monto - $sumN) / 1.19);
@@ -1091,10 +1101,10 @@ if(isset($_POST['dia']) && isset($_POST['mes']) && isset($_POST['anio']) && isse
     $sumONAnt = 0;
 
     while($row = mysqli_fetch_assoc($res)){
-        $montoAnt += $row['monto'];
-        $sumOrdAnt += $row['ordTienda'];
-        $sumNAnt += $row['ncredito'];
-        $sumONAnt += $row['ordncredito'];
+        $montoAnt = $row['monto'];
+        $sumOrdAnt = $row['ordTienda'];
+        $sumNAnt = $row['ncredito'];
+        $sumONAnt = $row['ordncredito'];
     }
 
     $ingresonetoAnt = round(($montoAnt - $sumNAnt) / 1.19);
