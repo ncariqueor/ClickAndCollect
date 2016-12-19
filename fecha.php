@@ -2,6 +2,7 @@
 date_default_timezone_set("America/Santiago");
 ini_set("max_execution_time", 0);
 require_once 'Classes/PHPExcel.php';
+require_once 'fecha_es.php';
 
 $mes  = $_GET['mes'];
 $anio = $_GET['anio'];
@@ -15,9 +16,9 @@ $dia  = $_GET['diaant'];
 
 $buscarant = $anio . $mes . $dia;
 
-$buscaract = new DateTime($buscaract);
+$buscaractAnt = date("Ymd", strtotime("{$buscaract} -1 year"));
 
-$buscarant = new DateTime($buscarant);
+$buscarantAnt = date("Ymd", strtotime("{$buscarant} -1 year"));
 
 $con = new mysqli('localhost', 'root', '', 'clickcollect');
 
@@ -27,31 +28,35 @@ $excel->getProperties()->setCreator("Operaciones")
     ->setLastModifiedBy("Operaciones")
     ->setTitle("Panel Click & Collect");
 
-$titulo = "Panel Click & Collect - Entre el " . diasem($buscaract->format("D")) . ", " . $buscaract->format("d-m-Y") . " y el " . diasem($buscarant->format("D")) . ", " . $buscarant->format("d-m-Y");
+$titulo_general_1 = "Click & Collect entre " . obtenerDia(date("D", strtotime("{$buscaract}"))) . ", " . date("d/m/Y", strtotime("{$buscaract}")) . " y " . obtenerDia(date("D", strtotime("{$buscarant}"))) . ", " . date("d/m/Y", strtotime("{$buscarant}")) . " (actual).";
 
-$titulos1 = array('Tiendas', 'Ingreso Bruto', 'Notas de Crédito', 'Ingreso Neto (Sin IVA)', 'Costo Venta', 'Contribución', 'Márgen');
+$titulo_general_2 = "Click & Collect entre " . obtenerDia(date("D", strtotime("{$buscaractAnt}"))) . ", " . date("d/m/Y", strtotime("{$buscaractAnt}")) . " y " . obtenerDia(date("D", strtotime("{$buscarantAnt}"))) . ", " . date("d/m/Y", strtotime("{$buscarantAnt}")) . " (anterior).";
 
-$titulos2 = array('Monto $', '#');
+$titulos1 = array('Tiendas', 'Ingreso Bruto', 'Notas de Crédito', 'Ingreso Neto (Sin IVA)', '% R/Past');
 
-$excel->setActiveSheetIndex(0)
-    ->mergeCells('A1:J1')
-
-    ->mergeCells('A2:A3')
-    ->mergeCells('B2:C2')
-    ->mergeCells('D2:E2')
-    ->mergeCells('F2:G2')
-    ->mergeCells('J2:J3');
+$titulos2 = array('Monto $', '#', 'Ticket Promedio');
 
 $excel->setActiveSheetIndex(0)
-    ->setCellValue('A1', $titulo)
+    ->mergeCells('B1:H1') //Titulo 1
+    ->mergeCells('I1:L1') //Titulo 2
 
-    ->setCellValue('A2', $titulos1[0])
+    ->mergeCells('A1:A3') //Tiendas
+    ->mergeCells('B2:C2') //Ingreso Bruto
+    ->mergeCells('D2:E2') //Notas de Crédito
+    ->mergeCells('F2:H2') //Ingreso Neto actual
+    ->mergeCells('I2:K2') //Ingreso Neto anterior
+    ->mergeCells('L2:L3');// %R/past
+
+$excel->setActiveSheetIndex(0)
+    ->setCellValue('B1', $titulo_general_1)
+    ->setCellValue('I1', $titulo_general_2)
+
+    ->setCellValue('A1', $titulos1[0])
     ->setCellValue('B2', $titulos1[1])
     ->setCellValue('D2', $titulos1[2])
     ->setCellValue('F2', $titulos1[3])
-    ->setCellValue('H2', $titulos1[4])
-    ->setCellValue('I2', $titulos1[5])
-    ->setCellValue('J2', $titulos1[6])
+    ->setCellValue('I2', $titulos1[3])
+    ->setCellValue('L2', $titulos1[4])
 
     ->setCellValue('B3', $titulos2[0])
     ->setCellValue('C3', $titulos2[1])
@@ -59,8 +64,10 @@ $excel->setActiveSheetIndex(0)
     ->setCellValue('E3', $titulos2[1])
     ->setCellValue('F3', $titulos2[0])
     ->setCellValue('G3', $titulos2[1])
-    ->setCellValue('H3', $titulos2[0])
-    ->setCellValue('I3', $titulos2[0]);
+    ->setCellValue('H3', $titulos2[2])
+    ->setCellValue('I3', $titulos2[0])
+    ->setCellValue('J3', $titulos2[1])
+    ->setCellValue('K3', $titulos2[2]);
 
 $colormalo = array(
     'font' => array(
@@ -149,208 +156,230 @@ $colormedio = array(
     )
 );
 
-$actual = $buscaract->format('Ymd');
+$query = "select tienda2 from tiendas order by tienda2 asc";
 
-$anterior = $buscarant->format('Ymd');
+$tienda = array();
 
-$query = "select sum(ingresobruto) as monto, sum(costo) as costo, sum(ordTienda) as ordTienda, sum(ncredito) as ncredito,
-                 sum(ordncredito) as ordncredito
-          from montos
+$ingreso_bruto_act     = array();
+$ord_ingreso_bruto_act = array();
+$nota_credito_act      = array();
+$ord_nota_credito_act  = array();
 
-          where tienda = 'Paris Internet' and fecha between $actual and $anterior";
-
-$res = $con->query($query);
-
-$monto = 0;
-
-$sumC = 0;
-
-$sumOrd = 0;
-
-$sumN = 0;
-
-$sumON = 0;
-
-while($row = mysqli_fetch_assoc($res)){
-    $monto += $row['monto'];
-    $sumC += $row['costo'];
-    $sumOrd += $row['ordTienda'];
-    $sumN += $row['ncredito'];
-    $sumON += $row['ordncredito'];
-}
-
-$ingresoneto = round(($monto - $sumN) / 1.19);
-
-$contribucion = $ingresoneto - $sumC;
-
-$ordn = $sumOrd - $sumON;
-
-$margen = 0;
-if($ingresoneto != 0)
-    $margen = $contribucion / $ingresoneto;
-
-$excel->setActiveSheetIndex(0)
-    ->setCellValue('A4', "Paris Internet")
-    ->setCellValue('B4', $monto)
-    ->setCellValue('C4', $sumOrd)
-    ->setCellValue('D4', $sumN)
-    ->setCellValue('E4', $sumON)
-    ->setCellValue('F4', $ingresoneto)
-    ->setCellValue('G4', $ordn)
-    ->setCellValue('H4', $sumC)
-    ->setCellValue('I4', $contribucion)
-    ->setCellValue('J4', $margen);
-
-if($margen*100 > 0)
-    $excel->getActiveSheet()->getStyle('J4')->applyFromArray($colorbueno);
-
-if($margen*100 < 0)
-    $excel->getActiveSheet()->getStyle('J4')->applyFromArray($colormalo);
-
-if($margen*100 == 0)
-    $excel->getActiveSheet()->getStyle('J4')->applyFromArray($colormedio);
-
-$query = "select tienda2 from tiendas";
+$ingreso_bruto_ant     = array();
+$ord_ingreso_bruto_ant = array();
+$nota_credito_ant      = array();
+$ord_nota_credito_ant  = array();
 
 $res = $con->query($query);
-
-$tienda[] = array();
 
 $i = 0;
 
 while($row = mysqli_fetch_assoc($res)){
     $tienda[$i] = $row['tienda2'];
+
+    $ingreso_bruto_act[$i]     = 0;
+    $ord_ingreso_bruto_act[$i] = 0;
+    $nota_credito_act[$i]      = 0;
+    $ord_nota_credito_act[$i]  = 0;
+
+    $ingreso_bruto_ant[$i]     = 0;
+    $ord_ingreso_bruto_ant[$i] = 0;
+    $nota_credito_ant[$i]      = 0;
+    $ord_nota_credito_ant[$i]  = 0;
+
     $i++;
 }
 
-$cantT = count($tienda);
+//ACTUAL
 
-$ingresobruto[] = array();
-$ordingresobruto[] = array();
-$ncredito[] = array();
-$ordncredito[] = array();
-$ineto[] = array();
-$ordneto[] = array();
-$sumcosto[] = array();
-$contr[] = array();
-$marg[] = array();
+$query = "select sum(ingresobruto) as monto, sum(ordTienda) as ordTienda, sum(ncredito) as ncredito,
+                 sum(ordncredito) as ordncredito, tienda
 
-for($i=0; $i<$cantT; $i++) {
-    $shop = $tienda[$i];
+          from montos
 
-    $query = "select tienda, sum(ingresobruto) as monto, sum(costo) as costo, sum(ordTienda) as ordTienda, sum(ncredito) as ncredito,
-                             sum(ordncredito) as ordncredito
+          where tienda <> 'Paris Internet' and fecha between $buscaract and $buscarant group by tienda order by monto asc";
 
-                      from montos
+$res = $con->query($query);
 
-                      where tienda = '$shop' and fecha between $actual and $anterior group by tienda order by monto asc";
-
-    $res = $con->query($query);
-
-    $monto = 0;
-
-    $sumC = 0;
-
-    $sumOrd = 0;
-
-    $sumN = 0;
-
-    $sumON = 0;
-
-    while ($row = mysqli_fetch_assoc($res)) {
-        $monto += $row['monto'];
-        $sumC += $row['costo'];
-        $sumOrd += $row['ordTienda'];
-        $sumN += $row['ncredito'];
-        $sumON += $row['ordncredito'];
-    }
-
-    $ingresoneto = round(($monto - $sumN) / 1.19);
-
-    $contribucion = $ingresoneto - $sumC;
-
-    $margen = 0;
-    if ($ingresoneto != 0)
-        $margen = $contribucion / $ingresoneto;
-
-    $ingresobruto[$i] = $monto;
-    $ordingresobruto[$i] = $sumOrd;
-    $ncredito[$i] = $sumN;
-    $ordncredito[$i] = $sumON;
-    $sumcosto[$i] = $sumC;
-    $ineto[$i] = $ingresoneto;
-    $ordneto[$i] = $sumOrd - $sumON;
-    $contr[$i] = $contribucion;
-    $marg[$i] = $margen;
+while($row = mysqli_fetch_assoc($res)){
+    $i                         = array_search($row['tienda'], $tienda);
+    $ingreso_bruto_act[$i]     = $row['monto'];
+    $ord_ingreso_bruto_act[$i] = $row['ordTienda'];
+    $nota_credito_act[$i]      = $row['ncredito'];
+    $ord_nota_credito_act[$i]  = $row['ordncredito'];
 }
 
-for($i = 1; $i < $cantT; $i++){
-    for($j = 0; $j < ($cantT - $i); $j++){
-        if($ineto[$j] < $ineto[$j + 1]){
-            $auxtienda = $tienda[$j];
-            $auxineto = $ineto[$j];
-            $auxingresobruto = $ingresobruto[$j];
-            $auxordingresobruo = $ordingresobruto[$j];
-            $auxncredito = $ncredito[$j];
-            $auxordncredito = $ordncredito[$j];
-            $auxsumcosto = $sumcosto[$j];
-            $auxordneto = $ordneto[$j];
-            $auxcontr = $contr[$j];
-            $auxmarg = $marg[$j];
+//ANTERIOR
 
+$query = "select sum(ingresobruto) as monto, sum(ordTienda) as ordTienda, sum(ncredito) as ncredito,
+                 sum(ordncredito) as ordncredito, tienda
+
+          from montos
+
+          where tienda <> 'Paris Internet' and fecha between $buscaractAnt and $buscarantAnt group by tienda order by monto asc";
+
+$res = $con->query($query);
+
+while($row = mysqli_fetch_assoc($res)){
+    $i                         = array_search($row['tienda'], $tienda);
+    $ingreso_bruto_ant[$i]     = $row['monto'];
+    $ord_ingreso_bruto_ant[$i] = $row['ordTienda'];
+    $nota_credito_ant[$i]      = $row['ncredito'];
+    $ord_nota_credito_ant[$i]  = $row['ordncredito'];
+}
+
+$cant = count($tienda);
+
+$total_ingreso_bruto_act     = 0;
+$total_ord_ingreso_bruto_act = 0;
+$total_nota_credito_act      = 0;
+$total_ord_nota_credito_act  = 0;
+
+$total_ingreso_bruto_ant     = 0;
+$total_ord_ingreso_bruto_ant = 0;
+$total_nota_credito_ant      = 0;
+$total_ord_nota_credito_ant  = 0;
+
+for($i = 0; $i < $cant; $i++){
+    $total_ingreso_bruto_act     += $ingreso_bruto_act[$i];
+    $total_ord_ingreso_bruto_act += $ord_ingreso_bruto_act[$i];
+    $total_nota_credito_act      += $nota_credito_act[$i];
+    $total_ord_nota_credito_act  += $ord_nota_credito_act[$i];
+
+    $total_ingreso_bruto_ant     += $ingreso_bruto_ant[$i];
+    $total_ord_ingreso_bruto_ant += $ord_ingreso_bruto_ant[$i];
+    $total_nota_credito_ant      += $nota_credito_ant[$i];
+    $total_ord_nota_credito_ant  += $ord_nota_credito_ant[$i];
+}
+
+$total_ingreso_neto_act = round(($total_ingreso_bruto_act - $total_nota_credito_act) / 1.19);
+
+$total_ord_ingreso_neto_act = $total_ord_ingreso_bruto_act - $total_ord_nota_credito_act;
+
+$total_ingreso_neto_ant = round(($total_ingreso_bruto_ant - $total_nota_credito_ant) / 1.19);
+
+$total_ord_ingreso_neto_ant = $total_ord_ingreso_bruto_ant - $total_ord_nota_credito_ant;
+
+$ticketpro = 0;
+if($total_ord_ingreso_neto_act != 0)
+    $ticketpro = round($total_ingreso_neto_act / $total_ord_ingreso_neto_act);
+
+$ticketproAnt = 0;
+if($total_ord_ingreso_neto_ant != 0)
+    $ticketproAnt = round($total_ingreso_neto_ant / $total_ord_ingreso_neto_ant);
+
+$rpast = 0;
+if($total_ingreso_neto_ant != 0)
+    $rpast = round((($total_ingreso_neto_act / $total_ingreso_neto_ant) - 1) * 100);
+
+$excel->setActiveSheetIndex(0)
+    ->setCellValue('A4', "Total C&C")
+    ->setCellValue('B4', $total_ingreso_bruto_act)
+    ->setCellValue('C4', $total_ord_ingreso_bruto_act)
+    ->setCellValue('D4', $total_nota_credito_act)
+    ->setCellValue('E4', $total_ord_nota_credito_act)
+    ->setCellValue('F4', $total_ingreso_neto_act)
+    ->setCellValue('G4', $total_ord_ingreso_neto_act)
+    ->setCellValue('H4', $ticketpro)
+    ->setCellValue('I4', $total_ingreso_neto_ant)
+    ->setCellValue('J4', $total_ord_ingreso_neto_ant)
+    ->setCellValue('K4', $ticketproAnt)
+    ->setCellValue('L4', $rpast);
+
+if($rpast > 0)
+    $excel->getActiveSheet()->getStyle('L4')->applyFromArray($colorbueno);
+
+if($rpast < 0)
+    $excel->getActiveSheet()->getStyle('L4')->applyFromArray($colormalo);
+
+if($rpast == 0)
+    $excel->getActiveSheet()->getStyle('L4')->applyFromArray($colormedio);
+
+for($i = 1; $i < ($cant - 1); $i++){
+    for($j = 0; $j < ($cant - 2); $j++){
+        if($ingreso_bruto_act[$j] < $ingreso_bruto_act[$j+1]){
+            $tmp_tienda = $tienda[$j];
             $tienda[$j] = $tienda[$j+1];
-            $ineto[$j] = $ineto[$j+1];
-            $ingresobruto[$j] = $ingresobruto[$j+1];
-            $ordingresobruto[$j] = $ordingresobruto[$j+1];
-            $ncredito[$j] = $ncredito[$j+1];
-            $ordncredito[$j] = $ordncredito[$j+1];
-            $sumcosto[$j] = $sumcosto[$j+1];
-            $ordneto[$j] = $ordneto[$j+1];
-            $contr[$j] = $contr[$j+1];
-            $marg[$j] = $marg[$j+1];
+            $tienda[$j+1] = $tmp_tienda;
 
-            $tienda[$j+1] = $auxtienda;
-            $ineto[$j+1] = $auxineto;
-            $ingresobruto[$j+1] = $auxingresobruto;
-            $ordingresobruto[$j+1] = $auxordingresobruo;
-            $ncredito[$j+1] = $auxncredito;
-            $ordncredito[$j+1] = $auxordncredito;
-            $sumcosto[$j+1] = $auxsumcosto;
-            $ordneto[$j+1] = $auxordneto;
-            $contr[$j+1] = $auxcontr;
-            $marg[$j+1] = $auxmarg;
+            $tmp_ingreso_bruto_act = $ingreso_bruto_act[$j];
+            $ingreso_bruto_act[$j] = $ingreso_bruto_act[$j+1];
+            $ingreso_bruto_act[$j+1] = $tmp_ingreso_bruto_act;
+
+            $tmp_ord_ingreso_bruto_act = $ord_ingreso_bruto_act[$j];
+            $ord_ingreso_bruto_act[$j] = $ord_ingreso_bruto_act[$j+1];
+            $ord_ingreso_bruto_act[$j+1] = $tmp_ord_ingreso_bruto_act;
+
+            $tmp_nota_credito_act = $nota_credito_act[$j];
+            $nota_credito_act[$j] = $nota_credito_act[$j+1];
+            $nota_credito_act[$j+1] = $tmp_nota_credito_act;
+
+            $tmp_ord_nota_credito_act = $ord_nota_credito_act[$j];
+            $ord_nota_credito_act[$j] = $ord_nota_credito_act[$j+1];
+            $ord_nota_credito_act[$j+1] = $tmp_ord_nota_credito_act;
+
+            $tmp_ingreso_bruto_ant = $ingreso_bruto_ant[$j];
+            $ingreso_bruto_ant[$j] = $ingreso_bruto_ant[$j+1];
+            $ingreso_bruto_ant[$j+1] = $tmp_ingreso_bruto_ant;
+
+            $tmp_ord_ingreso_bruto_ant = $ord_ingreso_bruto_ant[$j];
+            $ord_ingreso_bruto_ant[$j] = $ord_ingreso_bruto_ant[$j+1];
+            $ord_ingreso_bruto_ant[$j+1] = $tmp_ord_ingreso_bruto_ant;
+
+            $tmp_nota_credito_ant = $nota_credito_ant[$j];
+            $nota_credito_ant[$j] = $nota_credito_ant[$j+1];
+            $nota_credito_ant[$j+1] = $tmp_nota_credito_ant;
+
+            $tmp_ord_nota_credito_ant = $ord_nota_credito_ant[$j];
+            $ord_nota_credito_ant[$j] = $ord_nota_credito_ant[$j+1];
+            $ord_nota_credito_ant[$j+1] = $tmp_ord_nota_credito_ant;
         }
     }
 }
 
 $j = 5;
-for($i=0; $i<$cantT; $i++){
-    if($tienda[$i] == 'Nunoa')
-        $tienda[$i] = "Ñuñoa";
 
-    if($tienda[$i] == 'Estacion Central')
-        $tienda[$i] = "Estación Central";
+for($i = 0; $i < $cant; $i++){
+    $ingreso_neto_act = round(($ingreso_bruto_act[$i] - $nota_credito_act[$i]) / 1.19);
+    $ord_ingreso_neto_act = $ord_ingreso_bruto_act[$i] - $ord_nota_credito_act[$i];
+
+    $ingreso_neto_ant = round(($ingreso_bruto_ant[$i] - $nota_credito_ant[$i]) / 1.19);
+    $ord_ingreso_neto_ant = $ord_ingreso_bruto_ant[$i] - $ord_nota_credito_ant[$i];
+
+    $ticketpro = 0;
+    if($ord_ingreso_neto_act != 0)
+        $ticketpro = round($ingreso_neto_act / $ord_ingreso_neto_act);
+
+    $ticketproAnt = 0;
+    if($ord_ingreso_neto_ant != 0)
+        $ticketproAnt = round($ingreso_neto_ant / $ord_ingreso_neto_ant);
+
+    $rpast = 0;
+    if($ingreso_neto_ant != 0)
+        $rpast = round((($ingreso_neto_act / $ingreso_neto_ant) - 1) * 100);
 
     $excel->setActiveSheetIndex(0)
-        ->setCellValue('A'.$j, $tienda[$i])
-        ->setCellValue('B'.$j, $ingresobruto[$i])
-        ->setCellValue('C'.$j, $ordingresobruto[$i])
-        ->setCellValue('D'.$j, $ncredito[$i])
-        ->setCellValue('E'.$j, $ordncredito[$i])
-        ->setCellValue('F'.$j, $ineto[$i])
-        ->setCellValue('G'.$j, $ordneto[$i])
-        ->setCellValue('H'.$j, $sumcosto[$i])
-        ->setCellValue('I'.$j, $contr[$i])
-        ->setCellValue('J'.$j, $marg[$i]);
+        ->setCellValue("A$j", $tienda[$i])
+        ->setCellValue("B$j", $ingreso_bruto_act[$i])
+        ->setCellValue("C$j", $ord_ingreso_bruto_act[$i])
+        ->setCellValue("D$j", $nota_credito_act[$i])
+        ->setCellValue("E$j", $ord_nota_credito_act[$i])
+        ->setCellValue("F$j", $ingreso_neto_act)
+        ->setCellValue("G$j", $ord_ingreso_neto_act)
+        ->setCellValue("H$j", $ticketpro)
+        ->setCellValue("I$j", $ingreso_neto_ant)
+        ->setCellValue("J$j", $ord_ingreso_neto_ant)
+        ->setCellValue("K$j", $ticketproAnt)
+        ->setCellValue("L$j", $rpast);
 
-    if($marg[$i]*100 > 0)
-        $excel->getActiveSheet()->getStyle('J'.$j)->applyFromArray($colorbueno);
+    if($rpast > 0)
+        $excel->getActiveSheet()->getStyle("L$j")->applyFromArray($colorbueno);
 
-    if($marg[$i]*100 < 0)
-        $excel->getActiveSheet()->getStyle('J'.$j)->applyFromArray($colormalo);
+    if($rpast < 0)
+        $excel->getActiveSheet()->getStyle("L$j")->applyFromArray($colormalo);
 
-    if($marg[$i]*100 == 0)
-        $excel->getActiveSheet()->getStyle('J'.$j)->applyFromArray($colormedio);
+    if($rpast == 0)
+        $excel->getActiveSheet()->getStyle("L$j")->applyFromArray($colormedio);
 
     $j++;
 }
@@ -367,7 +396,7 @@ $estiloInformacion = array(
 $color1 = array(
     'font' => array(
         'name'  => 'Calibri',
-        'size' => '20',
+        'size' => '15',
         'color' => array(
             'rgb' => '000000'
         )
@@ -488,27 +517,27 @@ $color4 = array(
 );
 
 
-$excel->getActiveSheet()->getStyle('A1:J1')->applyFromArray($color1);
+$excel->getActiveSheet()->getStyle('A1:L1')->applyFromArray($color1);
 $excel->getActiveSheet()->getStyle('A2:A3')->applyFromArray($color2);
 $excel->getActiveSheet()->getStyle('B2:E3')->applyFromArray($color3);
 $excel->getActiveSheet()->getStyle('F2:H3')->applyFromArray($color2);
-$excel->getActiveSheet()->getStyle('I2:J3')->applyFromArray($color4);
-$excel->getActiveSheet()->getStyle('I2:J3')->applyFromArray($color4);
-$excel->getActiveSheet()->getStyle('A4:J'.($j-1))->applyFromArray($estiloInformacion);
+$excel->getActiveSheet()->getStyle('I2:L3')->applyFromArray($color4);
+$excel->getActiveSheet()->getStyle('A4:L'.($j-1))->applyFromArray($estiloInformacion);
 
-$excel->setActiveSheetIndex(0)->getColumnDimension('A')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('B')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('C')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('D')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('E')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('F')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('G')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('H')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('I')->setWidth('25');
-$excel->setActiveSheetIndex(0)->getColumnDimension('J')->setWidth('25');
+$excel->setActiveSheetIndex(0)->getColumnDimension('A')->setWidth('30');
+$excel->setActiveSheetIndex(0)->getColumnDimension('B')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('C')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('D')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('E')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('F')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('G')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('H')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('I')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('J')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('K')->setWidth('20');
+$excel->setActiveSheetIndex(0)->getColumnDimension('L')->setWidth('20');
 
-$excel->getActiveSheet()->getStyle('B4:I' . ($j-1))->getNumberFormat()->setFormatCode('#,##0');
-$excel->getActiveSheet()->getStyle('J4:J' . ($j-1))->getNumberFormat()->setFormatCode('#,##0.0 %');
+$excel->getActiveSheet()->getStyle('B4:K' . ($j - 1))->getNumberFormat()->setFormatCode('#,##0');
 
 for($i=2; $i<=($j-1); $i++)
     $excel->getActiveSheet()->getRowDimension($i)->setRowHeight(25);
